@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File Upload</title>
+  <style>
+    /* Existing styles */
+    body {
+      font-family: Arial, sans-serif;
+      background: #F0F0F0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      flex-direction: column;
+    }
+    #drop-zone {
+      border: 2px dashed #007BFF;
+      border-radius: 10px;
+      padding: 50px;
+      text-align: center;
+      color: #007BFF;
+      background: white;
+      transition: all 0.3s;
+    }
+    #drop-zone.hover {
+      border-color: #0056B3;
+      color: #0056B3;
+      background: #E7F3FF;
+    }
+    form {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+    label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 1.2em;
+      color: #333;
+      border: 2px solid #007BFF;
+      border-radius: 10px;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    button {
+      background: #007BFF;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #0056B3;
+    }
+    #progress-container {
+      display: none;
+      margin-top: 20px;
+    }
+    #progress-bar {
+      width: 100%;
+      background: #ddd;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    #progress-bar div {
+      height: 20px;
+      width: 0;
+      background: #4CAF50;
+      text-align: center;
+      color: white;
+      line-height: 20px;
+      border-radius: 5px 0 0 5px;
+      transition: width 0.3s;
+    }
+    #speed {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #666;
+    }
+    #response-container {
+      display: none;
+      margin-top: 20px;
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    #response-container h2 {
+      margin-top: 0;
+      font-size: 1.5em;
+      color: #333;
+    }
+    #response-container .file-list {
+      display: flex;
+      flex-direction: column;
+    }
+    #response-container .file-item {
+      margin-bottom: 10px;
+    }
+    #response-container .file-item a {
+      text-decoration: none;
+      color: #007BFF;
+      font-size: 1.1em;
+    }
+    #response-container .file-item a:hover {
+      text-decoration: underline;
+    }
+
+    #image-names {
+      margin-top: 20px;
+      font-size: 1em;
+      color: #333;
+    }
+    #image-names ul {
+      list-style-type: none;
+      padding: 0;
+    }
+    #image-names li {
+      margin-bottom: 5px;
+    }
+    #image-names li::before {
+      content: '• ';
+      color: #007BFF;
+    }
+  </style>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const dropZone = document.getElementById('drop-zone');
+      const fileInput = document.getElementById('file');
+      const form = document.querySelector('form');
+      const progressBar = document.getElementById('progress-bar').firstElementChild;
+      const progressContainer = document.getElementById('progress-container');
+      const speedDisplay = document.getElementById('speed');
+      const responseContainer = document.getElementById('response-container');
+      const imageNamesContainer = document.getElementById('image-names');
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('hover');
+      });
+      
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('hover');
+      });
+      
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('hover');
+        fileInput.files = e.dataTransfer.files;
+        displayImageNames(fileInput.files);
+      });
+      
+      fileInput.addEventListener('change', () => {
+        displayImageNames(fileInput.files);
+      });
+
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const files = fileInput.files;
+        if (files.length === 0) return;
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append('file', file);
+        }
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action, true);
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            progressBar.style.width = percentComplete + '%';
+            progressBar.textContent = Math.floor(percentComplete) + '%';
+            const elapsedTime = (new Date().getTime() - startTime) / 1000; // seconds
+            const uploadSpeed = (e.loaded / elapsedTime / 1024).toFixed(2); // KB/s
+            speedDisplay.textContent = `Upload speed: ${uploadSpeed} KB/s`;
+          }
+        });
+        xhr.upload.addEventListener('loadstart', () => {
+          progressContainer.style.display = 'block';
+          startTime = new Date().getTime();
+        });
+        xhr.upload.addEventListener('loadend', () => {
+          progressBar.style.width = '100%';
+          progressBar.textContent = 'Upload complete';
+        });
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === XMLHttpRequest.DONE) {
+            const response = JSON.parse(xhr.responseText);
+            responseContainer.style.display = 'block';
+            responseContainer.innerHTML = `
+              <h2>Uploaded Files</h2>
+              <div class="file-list">
+                ${response.detail.map(file => `
+                  <div class="file-item">
+                    <a href="${file.file}" target="_blank">${file.file}</a>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }
+        };
+        xhr.send(formData);
+      });
+
+      function displayImageNames(files) {
+        const fileNames = Array.from(files).map(file => `<li>${file.name}</li>`).join('');
+        imageNamesContainer.innerHTML = `<ul>${fileNames}</ul>`;
+      }
+    });
+  </script>
+</head>
+<body>
+  <form method="post" enctype="multipart/form-data" action="http://localhost:5000/upload">
+    <label for="file">Choose files</label>
+    <div id="drop-zone">Drag and drop files here or click to select files</div>
+    <input type="file" name="file" multiple id="file" />
+    <button type="submit">Submit</button>
+  </form>
+  <div id="progress-container">
+    <div id="progress-bar">
+      <div></div>
+    </div>
+    <div id="speed"></div>
+  </div>
+  <div id="response-container">
+    <pre></pre>
+  </div>
+  <div id="image-names"></div>
+</body>
+</html>
